@@ -1,6 +1,6 @@
-from boss_vi import plot
-from boss_vi import read_spec
-from boss_vi import VI_log
+from spec_vi.boss.plot import plot
+from spec_vi.boss.read_spec import read_spec
+from spec_vi import VI_log
 from os import getenv
 import os.path as ptt
 from glob import glob
@@ -25,8 +25,7 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
     print("      'm' to toggle the model fit (shifted to rest frame)")
     if full:
         print("      'f' to toggle to individual exposures")
-    figsize=[8,6]
-    showmodel = False
+
     if manual is None:
         chunk = fits.getdata(chunkfile)
         
@@ -39,6 +38,12 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
             type = type.replace('Lite','Full')
 
         if download:
+            try:
+                access.remote()
+            except:
+                raise Exception("ERROR: No netrc file found. see https://sdss-access.readthedocs.io/en/latest/auth.html#auth")
+                exit()
+        
             access.remote()
             cnt = 0
             for row in chunk:
@@ -73,23 +78,34 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
                 else:
                     field = 'allepoch' if row['OBS'] else 'allepoch_lco'
 
-                file = ptt.join(getenv('BOSS_SPECTRO_REDUX'),row['RUN2D'],se,'spectra',sf,field,str(row['MJD']),row['SPEC_FILE'])
+                file = ptt.join(getenv('BOSS_SPECTRO_REDUX'),row['RUN2D'],se,
+                                'spectra',sf,field,str(row['MJD']),
+                                row['SPEC_FILE'])
                 spec, spall, exts = read_spec(file,full=full)
             except:
                 if not allepoch:
-                    target_kwrds = {'run2d':row['RUN2D'], 'fieldid':row['FIELD'], 'mjd':row['MJD'], 'catalogid':row['CATALOGID']}
+                    target_kwrds = {'run2d':row['RUN2D'], 'fieldid':row['FIELD'],
+                                    'mjd':row['MJD'], 'catalogid':row['CATALOGID']}
+                    field = row['FIELD']
                 else:
-                    coadd = 'allepoch' if row['OBS'] else 'allepoch_lco'
-                    target_kwrds = {'coadd':coadd, 'run2d':row['RUN2D'], 'mjd':row['MJD'], 'catalogid':row['CATALOGID']}
+                    field = 'allepoch' if row['OBS'] else 'allepoch_lco'
+                    target_kwrds = {'coadd':field, 'run2d':row['RUN2D'],
+                                'mjd':row['MJD'], 'catalogid':row['CATALOGID']}
                 file = path.full(type,**target_kwrds)
                 spec, spall, exts = read_spec(file, full=full)
-            plot(spec,spall, i, exts=exts)
+            plot(spec,spall, i, vi_log, exts=exts, allsky = allepch, field=field)
     else:
         files = glob(manual)
         for i, file in enumerate(files):
             if start is not None:
                 if i < start: continue
             spec, spall, exts = read_spec(file, full= full)
-            plot(spec,spall,i, exts = exts)
+            if spall['FIELD'] == 0:
+                field = 'allepoch' if spall['OBS'] else 'allepoch_lco'
+                allsky = True
+            else:
+                field = spall['FIELD']
+                allsky = False
+            plot(spec,spall,i, vi_log, exts = exts, allsky=allsky, field=field)
 
     vi_log.close()

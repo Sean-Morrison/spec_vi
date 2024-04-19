@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
-from boss_vi.BOSS_VI import boss_vi
+from spec_vi.boss import boss_vi
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Visual Inspection Tool for BOSS QSOs')
@@ -16,4 +16,4 @@ if __name__ == "__main__":
     parser.add_argument('--allepoch','-c',required=False, action='store_true',  help='Use all Epoch Spec files')
     args = parser.parse_args()
 
-    boss_vi(**var(args))
+    boss_vi(**vars(args))

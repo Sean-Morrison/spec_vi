@@ -1,4 +1,4 @@
-from boss_vi import build_title
+from spec_vi.boss.build_title import build_title
 from matplotlib import pyplot as plt
 from matplotlib.widgets import Button, Slider
 import numpy as np
@@ -37,17 +37,20 @@ elines= {3727.:'OII', 3869.7867:'NeIII', 4105.8884: r'H$\mathbf{\delta}$',
          2326.:'CII', 1400.:'SiIV+OIV'}
 
 
+figsize=[8,6]
+showmodel = False
 
-def plot(spec, spall, idx, exts = None):
+def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None):
     global figsize
     global cid
     global showmodel
     global exts_line
     z = spall['Z']
-    log_line = str(spall['RACAT'][0])+' '+str(spall['RACAT'][0])+' '+'{}'
+    log_line = str(spall['RACAT'])+' '+str(spall['RACAT'])+' '+'{}'
     #if z<0: return
     fig, ax = plt.subplots(figsize=figsize)
-    plt.title(build_title(spall),fontsize=10)
+    plt.title(build_title(spall, spall['CATALOGID'],
+                          allsky=allsky,field=field),fontsize=10)
     wave = np.power(10,spec['LOGLAM'])/(1+z)
     line, = ax.plot(wave, spec['FLUX'],label=idx+1)
     

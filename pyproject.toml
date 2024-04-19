@@ -1,0 +1,11 @@
+[tool.poetry]
+name = "spec_vi"
+version = "0.1.0"
+description = "Spectral Visualization Tools"
+authors = ["Sean Morrison <smorris0@illinois.edu>"]
+homepage = "https://github.com/Sean-Morrison/spec_vi"
+repository = "https://github.com/Sean-Morrison/spec_vi"
+keywords = ["astronomy", "software"]
+packages = [
+     { include = "spec_vi", from = "python" }
+]
