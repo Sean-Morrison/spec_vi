@@ -14,6 +14,7 @@ if __name__ == "__main__":
     parser.add_argument('--manual','-m',  required=False, default=None,         help='Use all spec Files matching this string (with wildcards)')
     parser.add_argument('--full','-f',    required=False, action='store_true',  help='Use SpecFull files if available')
     parser.add_argument('--allepoch','-c',required=False, action='store_true',  help='Use all Epoch Spec files')
+    parser.add_argument('--smoothing',    required=False, default=1, type=int,  help='Set Default Smoothing value (default:1)')
     args = parser.parse_args()
 
     boss_vi(**vars(args))

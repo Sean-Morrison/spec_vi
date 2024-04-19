@@ -3,6 +3,8 @@ from matplotlib import pyplot as plt
 from matplotlib.widgets import Button, Slider
 import numpy as np
 import sys
+import warnings
+
 
 #keymap.fullscreen: f, ctrl+f   # toggling
 #keymap.home: h, r, home        # home or reset mnemonic
@@ -39,12 +41,39 @@ elines= {3727.:'OII', 3869.7867:'NeIII', 4105.8884: r'H$\mathbf{\delta}$',
 
 figsize=[8,6]
 showmodel = False
+show_mask = False
+show_ivar = False
+def rebin(data,kernel_size ):
+    kernel = np.ones(kernel_size) / kernel_size
+    return np.convolve(data, kernel, mode='same')
 
-def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None):
+def nan_helper(y):
+    """Helper to handle indices and logical indices of NaNs.
+
+    Input:
+        - y, 1d numpy array with possible NaNs
+    Output:
+        - nans, logical indices of NaNs
+        - index, a function, with signature indices= index(logical_indices),
+            to convert logical indices of NaNs to 'equivalent' indices
+    Example:
+        >>> # linear interpolation of NaNs
+        >>> nans, x= nan_helper(y)
+        >>> y[nans]= np.interp(x(nans), x(~nans), y[~nans])
+    """
+    return  ~np.isfinite(y), lambda z: z.nonzero()[0]
+
+
+
+
+def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None,
+         smoothing=1):
     global figsize
     global cid
     global showmodel
     global exts_line
+    global show_mask
+    global show_ivar
     z = spall['Z']
     log_line = str(spall['RACAT'])+' '+str(spall['RACAT'])+' '+'{}'
     #if z<0: return
@@ -52,7 +81,59 @@ def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None):
     plt.title(build_title(spall, spall['CATALOGID'],
                           allsky=allsky,field=field),fontsize=10)
     wave = np.power(10,spec['LOGLAM'])/(1+z)
-    line, = ax.plot(wave, spec['FLUX'],label=idx+1)
+    flux = rebin(spec['FLUX'],smoothing )
+
+    line, = ax.plot(wave, flux,label=idx+1)
+
+    ylim = ax.get_ylim()
+    amask = 0.2 if show_mask else 0
+    
+    def _flag(wave, ivar,sflux, smoothing = 1, alpha = 0):
+        igd= np.where((ivar > 0) & (np.abs(wave-5577.) > 4.) & (wave < 10000.) & (wave > 3700.))[0]
+        if len(igd) > 0:
+            yra= [np.nanmin(sflux[igd]),np.nanmax(sflux[igd])]
+        else:
+            yra= [np.nanmin(sflux),np.nanmax(sflux)]
+        size= 0.07*(yra[1]-yra[0])
+        yra=yra+np.array([-1.2,1.7])*size*1000
+        if(yra[0] < -2.):
+            yra[0]=-1000
+        if yra[0] == yra[1]:
+            yra=[0,1]
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            err= np.sqrt(1/ivar)
+            ibad= np.where(ivar <= 0)[0]
+            nans, x= nan_helper(err)
+
+            if (len(nans) > 0) and (sum(nans) != len(nans)):
+                err[nans]= np.interp(x(nans), x(~nans), err[~nans])
+
+            err = rebin(err, 3)
+            #err=sdss_spec_smooth(np.log10(wave), err, 400)
+            yerr_u = err.copy()
+            yerr_l = err.copy()
+            yerr_u[ibad] = yra[1] - sflux[ibad]
+            yerr_l[ibad] = sflux[ibad] - yra[0]
+
+        #axs.axvspan(
+        fbad1 = ax.fill_between(rebin(wave,2), rebin(sflux-yerr_l,2), rebin(sflux+yerr_u,2),
+                        color='k', alpha=alpha, zorder = 1, ec=None, linewidth=0., step='mid')
+        fbad2 = ax.fill_between(wave, sflux-yerr_l,sflux+yerr_u, color='k', alpha=alpha,
+                         zorder = 1, ec=None, linewidth=0.)
+        
+        return(fbad1,fbad2)
+    
+    fbad1, fbad2 = _flag(wave, spec['IVAR'],spec['FLUX'], alpha = amask)
+    ax.set_ylim(ylim)
+    
+    aivar = 1 if show_ivar else 0
+    labivar = 'Error' if show_ivar else ''
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        err= np.sqrt(1/spec['IVAR'])
+    livar, = ax.plot(wave, err, color='C2',alpha =aivar, label = labivar)
     
     if exts is not None:
         if len(exts) == 0:
@@ -62,7 +143,8 @@ def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None):
 
             for l, x in enumerate(exts):
                 wavex = np.power(10,exts[x]['LOGLAM'])/(1+z)
-                linel, = ax.plot(wavex, exts[x]['FLUX'],label=None, alpha = 0, color=f'C{l+2}')
+                fluxx = rebin( exts[x]['FLUX'],smoothing )
+                linel, = ax.plot(wavex, fluxx,label=None, alpha = 0, color=f'C{l+3}')
                 exts_line.append(linel)
     else:
         exts_line = []
@@ -88,21 +170,34 @@ def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None):
                       valmin=0.0, valmax=7.5, valinit=z)
 
     # Make a vertically oriented slider to control the smoothing
-    axamp = fig.add_axes([0.1, 0.25, 0.0225, 0.63])
-    s_slider = Slider(ax=axamp, label="Smoothing", orientation="vertical",
-                      valmin=1, valmax=20, valinit=1, valstep=1)
+#    axamp = fig.add_axes([0.1, 0.25, 0.0225, 0.63])
+    axamp = fig.add_axes([0.25, 0.135, 0.65, 0.03])
+    s_slider = Slider(ax=axamp, label="Smoothing", #orientation="vertical",
+                      valmin=1, valmax=20, valinit=smoothing, valstep=1)
 
     # The function to be called anytime a slider's value changes
     def update(val):
         wave = np.power(10,spec['LOGLAM'])/(1+z_slider.val)
-        kernel = np.ones(s_slider.val) / s_slider.val
-        flux  = np.convolve(spec['FLUX'], kernel, mode='same')
+        flux = rebin(spec['FLUX'],s_slider.val )
+        #kernel = np.ones(s_slider.val) / s_slider.val
+        #flux  = np.convolve(spec['FLUX'], kernel, mode='same')
         line.set_ydata(flux)
         
+        dum1, dum2 = _flag(wave, spec['IVAR'],spec['FLUX'], smoothing = 1, alpha = 0)
+        dp = dum1.get_paths()[0]
+        fbad1.set_paths([dp.vertices])
+        dp = dum2.get_paths()[0]
+        fbad2.set_paths([dp.vertices])
+        dum1.remove()
+        dum2.remove()
+
+        livar.set_xdata(wave)
+
         if exts is not None:
             for l, x in enumerate(exts):
                 wavex = np.power(10,exts[x]['LOGLAM'])/(1+z_slider.val)
-                flux  = np.convolve(exts[x]['FLUX'], kernel, mode='same')
+                flux = rebin(exts[x]['FLUX'],s_slider.val )
+                #flux  = np.convolve(exts[x]['FLUX'], kernel, mode='same')
                 exts_line[l].set_ydata(flux)
 
         line.set_xdata(wave)
@@ -124,8 +219,14 @@ def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None):
     modelbutton = Button(resetax, 'Model', hovercolor='0.975')
  
     if exts is not None:
-        resetax = fig.add_axes([0.02, 0.135, 0.1, 0.04])
+        resetax = fig.add_axes([0.02, .94, 0.1, 0.04])
         Extbutton = Button(resetax, 'Extensions', hovercolor='0.975')
+
+    resetax = fig.add_axes([0.02, 0.135, 0.1, 0.04])
+    maskbutton = Button(resetax, 'Show Mask', hovercolor='0.975')
+
+    resetax = fig.add_axes([0.02, 0.19, 0.1, 0.04])
+    ivarbutton = Button(resetax, 'Show Error', hovercolor='0.975')
 
     resetax = fig.add_axes([0.15, 0.025, 0.15, 0.04])
     buttonnext= Button(resetax, 'next+save', hovercolor='0.975')
@@ -160,6 +261,35 @@ def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None):
         ax.legend()
         fig.canvas.draw_idle()
     modelbutton.on_clicked(setmodel)
+
+    def setMask(event):
+        global show_mask
+        if fbad1.get_alpha() == 0:
+            fbad1.set_alpha(.2)
+            fbad2.set_alpha(.2)
+            show_mask = True
+        else:
+            fbad1.set_alpha(0)
+            fbad2.set_alpha(0)
+            show_mask = False
+        ax.legend()
+        fig.canvas.draw_idle()
+    maskbutton.on_clicked(setMask)
+
+    def setIvar(event):
+        global show_ivar
+        if livar.get_alpha() == 0:
+            livar.set_alpha(1)
+            livar.set_label('ivar')
+            show_ivar = True
+        else:
+            livar.set_alpha(0)
+            show_ivar = False
+            livar.set_label(None)
+        ax.legend()
+        fig.canvas.draw_idle()
+    ivarbutton.on_clicked(setIvar)
+
 
     def setExt(event):
         global exts_line
@@ -207,6 +337,7 @@ def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None):
         global cid
         global showmodel
         global exts_line
+        global show_mask
         if event.key == 'r':
             z_slider.reset()
         elif event.key == 'q':
@@ -292,6 +423,30 @@ def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None):
                         ll.set_label(None)
                 ax.legend()
                 fig.canvas.draw_idle()
+        elif event.key == 'b':
+            if fbad1.get_alpha() == 0:
+                fbad1.set_alpha(.2)
+                fbad2.set_alpha(.2)
+                show_mask = True
+            else:
+                fbad1.set_alpha(0)
+                fbad2.set_alpha(0)
+                show_mask = False
+            ax.legend()
+            fig.canvas.draw_idle()
+        elif event.key == 'i':
+            global show_ivar
+            if livar.get_alpha() == 0:
+                livar.set_alpha(1)
+                livar.set_label('Error')
+
+                show_ivar = True
+            else:
+                livar.set_alpha(0)
+                show_ivar = False
+                livar.set_label(None)
+            ax.legend()
+            fig.canvas.draw_idle()
 
     cid = fig.canvas.mpl_connect('key_press_event', pan_nav)
     plt.show(block=True)

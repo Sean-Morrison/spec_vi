@@ -7,7 +7,8 @@ from glob import glob
 
 def boss_vi(chunkfile = None, logfile = None, append = False,
             start = None, download = False, epoch = False,
-            manual = None, full = False, allepoch = False):
+            manual = None, full = False, allepoch = False,
+            smoothing = 1):
             
     vi_log = VI_log(logfile, append = append)
 
@@ -23,6 +24,8 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
     print(u"      '\u2192' to increase redshift by 0.005")
     print("      'z' to manually enter redshift in the terminal")
     print("      'm' to toggle the model fit (shifted to rest frame)")
+    print("      'b' to toggle the mask (shifted to rest frame)")
+    print("      'i' to toggle the Errors (shifted to rest frame)")
     if full:
         print("      'f' to toggle to individual exposures")
 
@@ -93,7 +96,8 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
                                 'mjd':row['MJD'], 'catalogid':row['CATALOGID']}
                 file = path.full(type,**target_kwrds)
                 spec, spall, exts = read_spec(file, full=full)
-            plot(spec,spall, i, vi_log, exts=exts, allsky = allepch, field=field)
+            plot(spec,spall, i, vi_log, exts=exts, allsky = allepch,
+                 field=field, smoothing=smoothing)
     else:
         files = glob(manual)
         for i, file in enumerate(files):
@@ -106,6 +110,7 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
             else:
                 field = spall['FIELD']
                 allsky = False
-            plot(spec,spall,i, vi_log, exts = exts, allsky=allsky, field=field)
+            plot(spec,spall,i, vi_log, exts = exts, allsky=allsky,
+                 field=field, smoothing=smoothing)
 
     vi_log.close()
