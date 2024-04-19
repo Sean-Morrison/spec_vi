@@ -32,6 +32,17 @@ def phelp(full=False):
     return
 
 
+def fix_master_spall(spall, file):
+    spall['FIELD'] = ptt.basename(file).split('-')[1]
+    spall['RACAT'] = [spall['PLUG_RA']]
+    spall['DECCAT'] = [spall['PLUG_DEC']]
+    spall['SURVEY'] = ''
+    spall['PROGRAMNAME'] = ''
+    spall['FIBER2MAG'] = spall['MAG']
+    spall['RUN2D'] =  spall['RUN2D'].astype(object)
+    spall['RUN2D'] = ['master_plate']
+    return(spall)
+
 def boss_vi(chunkfile = None, logfile = None, append = False,
             start = None, download = False, epoch = False,
             manual = None, full = False, allepoch = False,
@@ -60,6 +71,9 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
             access.remote()
             cnt = 0
             for row in chunk:
+                if row['RUN2D'].lower() == 'master':
+                    if int(row['FIELD']) < 16000:
+                        row['RUN2D'] = 'master_plate'
                 if not allepoch:
                     target_kwrds = {'run2d':row['RUN2D'], 'fieldid':row['FIELD'],
                                     'mjd':row['MJD'], 'catalogid':row['CATALOGID']}
@@ -87,17 +101,27 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
                 if i < start: continue
             if row['OBJTYPE'].lower() != 'science':
                 continue
+            if row['RUN2D'].lower() == 'master':
+                if int(row['FIELD']) < 16000:
+                    row['RUN2D'] = 'master_plate'
             try:
                 sf = 'full' if full else 'lite'
                 se = 'epoch' if epoch else ''
                 if not allepoch:
-                    field = str(row['FIELD']).zfill(6)
+                    if row['RUN2D'] == 'master_plate':
+                        field = str(row['FIELD'])+'p'
+                    else:
+                        field = str(row['FIELD']).zfill(6)
                 else:
                     field = 'allepoch' if row['OBS'] else 'allepoch_lco'
 
+                try:
+                    file = row['SPEC_FILE']
+                except:
+                    file = ('spec-'+row['FIELD']+'-'+row['MJD']+'-'+
+                            str(row['CATALOGID']).zfill(11)+'.fits')
                 file = ptt.join(getenv('BOSS_SPECTRO_REDUX'),row['RUN2D'],se,
-                                'spectra',sf,field,str(row['MJD']),
-                                row['SPEC_FILE'])
+                                'spectra',sf,field,str(row['MJD']),file)
                 spec, spall, exts = read_spec(file,full=full)
                 
             except:
@@ -111,6 +135,12 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
                                 'mjd':row['MJD'], 'catalogid':row['CATALOGID']}
                 file = path.full(type,**target_kwrds)
                 spec, spall, exts = read_spec(file, full=full)
+            
+            try:
+                spall['RACAT']
+            except:
+                fix_master_spall(spall, file)
+            spall = spall[0]
             pp = plot(spec,spall, i, vi_log, exts=exts, allsky = allepoch,
                       field=field, smoothing=smoothing)
             spec = None
@@ -124,12 +154,22 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
             if start is not None:
                 if i < start: continue
             spec, spall, exts = read_spec(file, full= full)
-            if spall['FIELD'] == 0:
-                field = 'allepoch' if spall['OBS'] else 'allepoch_lco'
-                allsky = True
-            else:
-                field = spall['FIELD']
+            try:
+                if spall['FIELD'][0] == 0:
+                    field = 'allepoch' if spall['OBS'][0] else 'allepoch_lco'
+                    allsky = True
+                else:
+                    field = spall['FIELD'][0]
+                    allsky = False
+            except:
+                spall['FIELD'][0] = ptt.basename(file).split('-')[1]
                 allsky = False
+                field = spall['FIELD'][0]
+            try:
+                spall['RACAT']
+            except:
+                fix_master_spall(spall, file)
+            spall=spall[0]
             pp = plot(spec,spall,i, vi_log, exts = exts, allsky=allsky,
                       field=field, smoothing=smoothing)
             spec = None
