@@ -450,4 +450,7 @@ def plot(spec, spall, idx, vi_log, exts = None, allsky=False, field=None,
 
     cid = fig.canvas.mpl_connect('key_press_event', pan_nav)
     plt.show(block=True)
+    plt.close()
+    cid = None
+    exts_line = None
     return

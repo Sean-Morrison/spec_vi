@@ -11,13 +11,8 @@ from sdss_access.path import Path
 access = Access(release='sdsswork')
 path = Path(release='sdsswork')
 
-def boss_vi(chunkfile = None, logfile = None, append = False,
-            start = None, download = False, epoch = False,
-            manual = None, full = False, allepoch = False,
-            smoothing = 1):
-            
-    vi_log = VI_log(logfile, append = append)
 
+def phelp(full=False):
     print("Press 's' to move to next image saving redshift")
     print("      'n' to move to next image flagging as nonqso")
     print("      'q' to exit without saving current spectra")
@@ -34,6 +29,15 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
     print("      'i' to toggle the Errors (shifted to rest frame)")
     if full:
         print("      'f' to toggle to individual exposures")
+    return
+
+
+def boss_vi(chunkfile = None, logfile = None, append = False,
+            start = None, download = False, epoch = False,
+            manual = None, full = False, allepoch = False,
+            smoothing = 1):
+            
+    vi_log = VI_log(logfile, append = append)
 
     if manual is None:
         chunk = fits.getdata(chunkfile)
@@ -68,12 +72,16 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
                     if access.exists(type, **target_kwrds):
                         print('skipping '+access.find_location(type, **target_kwrds)+' (exists)')
                     else:
+                        print('Adding '+access.find_location(type, **target_kwrds))
                         access.add(type, **target_kwrds)
                         cnt += 1
             if cnt >0:
+                print('Downloading')
                 access.set_stream()
                 access.commit()
+                print('Downloading Complete')
         
+        phelp(full=full)
         for i,row in enumerate(chunk):
             if start is not None:
                 if i < start: continue
@@ -91,6 +99,7 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
                                 'spectra',sf,field,str(row['MJD']),
                                 row['SPEC_FILE'])
                 spec, spall, exts = read_spec(file,full=full)
+                
             except:
                 if not allepoch:
                     target_kwrds = {'run2d':row['RUN2D'], 'fieldid':row['FIELD'],
@@ -102,9 +111,14 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
                                 'mjd':row['MJD'], 'catalogid':row['CATALOGID']}
                 file = path.full(type,**target_kwrds)
                 spec, spall, exts = read_spec(file, full=full)
-            plot(spec,spall, i, vi_log, exts=exts, allsky = allepoch,
-                 field=field, smoothing=smoothing)
+            pp = plot(spec,spall, i, vi_log, exts=exts, allsky = allepoch,
+                      field=field, smoothing=smoothing)
+            spec = None
+            spall = None
+            exts = None
+            pp = None
     else:
+        phelp(full=full)
         files = glob(manual)
         for i, file in enumerate(files):
             if start is not None:
@@ -116,7 +130,10 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
             else:
                 field = spall['FIELD']
                 allsky = False
-            plot(spec,spall,i, vi_log, exts = exts, allsky=allsky,
-                 field=field, smoothing=smoothing)
-
+            pp = plot(spec,spall,i, vi_log, exts = exts, allsky=allsky,
+                      field=field, smoothing=smoothing)
+            spec = None
+            spall = None
+            exts = None
+            pp = None
     vi_log.close()

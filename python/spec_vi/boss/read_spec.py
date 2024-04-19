@@ -3,13 +3,15 @@ from collections import OrderedDict
 from astropy.table import Table
 
 def read_spec(file, full = False):
-    with fits.open(file) as hdul:
-        spec  = hdul[1].data
-        spall = hdul[2].data
-        if full:
-            exts = OrderedDict()
-            for x in hdul[5:]:
-                exts[x.header['EXPOSURE']] = x.data
-        else:
-            exts = None
-    return(spec,Table(spall)[0], exts)
+    hdul = fits.open(file, memmap=False)
+    spec  = Table(hdul[1].data)
+    spall = Table(hdul[2].data)[0]
+    if full:
+        exts = OrderedDict()
+        for x in hdul[5:]:
+            exts[x.header['EXPOSURE']] = x.data
+    else:
+        exts = None
+    hdul.close()
+    hdul = None
+    return(spec,spall, exts)
