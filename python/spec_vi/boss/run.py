@@ -97,7 +97,7 @@ def boss_vi(chunkfile = None, logfile = None, append = False,
                                 'mjd':row['MJD'], 'catalogid':row['CATALOGID']}
                 file = path.full(type,**target_kwrds)
                 spec, spall, exts = read_spec(file, full=full)
-            plot(spec,spall, i, vi_log, exts=exts, allsky = allepch,
+            plot(spec,spall, i, vi_log, exts=exts, allsky = allepoch,
                  field=field, smoothing=smoothing)
     else:
         files = glob(manual)
