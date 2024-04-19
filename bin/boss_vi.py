@@ -5,7 +5,7 @@ from spec_vi.boss import boss_vi
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Visual Inspection Tool for BOSS QSOs')
-    parser.add_argument('chunkfile', help='Name of the chunk file (if manual use None')
+    parser.add_argument('chunkfile', help='Name of the chunk file (if manual use None)')
     parser.add_argument('--logfile','-l', required=False, default='VI_log.dat', help='Name of VI Log')
     parser.add_argument('--append','-a',  required=False, action='store_true',  help='Append to old logfile')
     parser.add_argument('--start', '-s',  required=False, type=int,             help='Skip first n spectra and start with n+1', )

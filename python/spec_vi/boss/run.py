@@ -6,6 +6,11 @@ import os.path as ptt
 from glob import glob
 from astropy.io import fits
 
+from sdss_access import Access
+from sdss_access.path import Path
+access = Access(release='sdsswork')
+path = Path(release='sdsswork')
+
 def boss_vi(chunkfile = None, logfile = None, append = False,
             start = None, download = False, epoch = False,
             manual = None, full = False, allepoch = False,
