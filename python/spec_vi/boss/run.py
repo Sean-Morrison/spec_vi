@@ -4,6 +4,7 @@ from spec_vi import VI_log
 from os import getenv
 import os.path as ptt
 from glob import glob
+from astropy.io import fits
 
 def boss_vi(chunkfile = None, logfile = None, append = False,
             start = None, download = False, epoch = False,
