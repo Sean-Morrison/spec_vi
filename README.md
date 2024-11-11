@@ -10,9 +10,6 @@ It requires a number of python packages
 - sdsstools
 - sdss_access
 
-## Running at Utah
-For SDSS-V members with Utah accounts, the package is already installed and can be loaded with the spec_vi module
-
 
 # Running the BOSS Visual Inspection
 The BOSS VI tool can be run with
